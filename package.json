@@ -1,13 +1,13 @@
 {
-  "name": "my-discord-bot",
+  "name": "bot-name",
   "version": "1.0.0",
-  "description": "Discord bot cu comenzi globale si sistem premium",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5"
+    "discord.js": "^14.11.0",
+    "dotenv": "^16.3.1"
   }
 }
