@@ -1,6 +1,5 @@
-
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, EmbedBuilder, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, ActionRowBuilder, ButtonBuilder, ButtonStyle, Events, EmbedBuilder, REST, Routes, SlashCommandBuilder, WebhookClient } = require('discord.js');
 
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -16,7 +15,6 @@ const client = new Client({
 const premiumUsers = new Set();
 
 // Webhook
-const { WebhookClient } = require('discord.js');
 const webhook = new WebhookClient({ url: WEBHOOK_URL });
 
 // Slash commands
@@ -63,58 +61,75 @@ _ _
 @everyone
 `;
 
+// --- Handlers globale pentru erori ---
+client.on('error', error => console.error('Discord client error:', error));
+process.on('unhandledRejection', reason => console.error('Unhandled Rejection:', reason));
+
 // Interaction
 client.on(Events.InteractionCreate, async interaction => {
-    // Slash commands
-    if (interaction.isChatInputCommand()) {
+    try {
+        if (interaction.isChatInputCommand()) {
 
-        // /a-message
-        if (interaction.commandName === 'a-message') {
-            await sendEmbedWithButton(interaction, PREDEFINED_MESSAGE, 'send_a_message');
-        }
-
-        // /custommessage
-        if (interaction.commandName === 'custommessage') {
-            const userId = interaction.user.id;
-            if (!premiumUsers.has(userId)) {
-                await interaction.reply({ content: '❌ You need premium to use this command.', ephemeral: true });
-                return;
+            // /a-message
+            if (interaction.commandName === 'a-message') {
+                await sendEmbedWithButton(interaction, PREDEFINED_MESSAGE, `send_a_message_${interaction.user.id}`);
             }
-            const msg = interaction.options.getString('mesaj');
-            await sendEmbedWithButton(interaction, msg, 'send_custom_message');
-        }
 
-        // /spooki-message
-        if (interaction.commandName === 'spooki-message') {
-            const embed = new EmbedBuilder()
-                .setColor('#ff6600')
-                .setTitle('—HAPPY HALLOWEEN—')
-                .setDescription('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTW_5SOFKI-axkCGp5AfBKTa9eW-zoHhjUZ4Z1v2eH1rg&')
-                .setImage('https://res.cloudinary.com/jerrick/image/upload/d_642250b563292b35f27461a7.png,f_jpg,fl_progressive,q_auto,w_1024/662817914f69f7001de7c721.png')
-                .setFooter({ text: '—SPOOKY— 🎃' });
-
-            await interaction.reply({ embeds: [embed] });
-            await logWebhook(interaction.user, '/spooki-message', '🎃 Sent spooky message');
-        }
-
-        // /give-premium-access
-        if (interaction.commandName === 'give-premium-access') {
-            if (interaction.user.id !== OWNER_ID) {
-                await interaction.reply({ content: '🚫 You do not have permission to use this command.', ephemeral: true });
-                return;
+            // /custommessage
+            if (interaction.commandName === 'custommessage') {
+                const userId = interaction.user.id;
+                if (!premiumUsers.has(userId)) {
+                    await interaction.reply({ content: '❌ You need premium to use this command.', ephemeral: true });
+                    return;
+                }
+                const msg = interaction.options.getString('mesaj');
+                await sendEmbedWithButton(interaction, msg, `send_custom_message_${interaction.user.id}`);
             }
-            const targetId = interaction.options.getString('userid');
-            premiumUsers.add(targetId);
-            await interaction.reply({ content: `✅ Premium access granted to <@${targetId}>!` });
-        }
-    }
 
-    // Button clicks
-    if (interaction.isButton()) {
-        let msgToSend = interaction.message.embeds[0]?.description || '';
-        await interaction.channel.send(msgToSend);
-        await interaction.reply({ content: '✅ Message sent!', ephemeral: true });
-        await logWebhook(interaction.user, 'button_click', msgToSend);
+            // /spooki-message
+            if (interaction.commandName === 'spooki-message') {
+                const embed = new EmbedBuilder()
+                    .setColor('#ff6600')
+                    .setTitle('—HAPPY HALLOWEEN—')
+                    .setDescription('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTW_5SOFKI-axkCGp5AfBKTa9eW-zoHhjUZ4Z1v2eH1rg&')
+                    .setImage('https://res.cloudinary.com/jerrick/image/upload/d_642250b563292b35f27461a7.png,f_jpg,fl_progressive,q_auto,w_1024/662817914f69f7001de7c721.png')
+                    .setFooter({ text: '—SPOOKY— 🎃' });
+
+                await interaction.reply({ embeds: [embed] });
+                await logWebhook(interaction.user, '/spooki-message', '🎃 Sent spooky message');
+            }
+
+            // /give-premium-access
+            if (interaction.commandName === 'give-premium-access') {
+                if (interaction.user.id !== OWNER_ID) {
+                    await interaction.reply({ content: '🚫 You do not have permission to use this command.', ephemeral: true });
+                    return;
+                }
+                const targetId = interaction.options.getString('userid');
+                premiumUsers.add(targetId);
+                await interaction.reply({ content: `✅ Premium access granted to <@${targetId}>!` });
+            }
+        }
+
+        // Button clicks
+        if (interaction.isButton()) {
+            const parts = interaction.customId.split('_'); // send_a_message_13866...
+            const ownerId = parts.slice(-1)[0];
+
+            if (interaction.user.id !== ownerId) {
+                return interaction.reply({ content: '❌ Only the command author can send this message.', ephemeral: true });
+            }
+
+            const msgToSend = interaction.message.embeds[0]?.description || '';
+
+            // --- Trimite mesajul în canal ---
+            await interaction.channel.send(msgToSend);
+            await interaction.reply({ content: '✅ Message sent!', ephemeral: true });
+
+            await logWebhook(interaction.user, 'button_click', msgToSend);
+        }
+    } catch (err) {
+        console.error('Interaction error:', err);
     }
 });
 
